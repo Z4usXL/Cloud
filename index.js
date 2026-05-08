@@ -1,27 +1,41 @@
 export default {
   async email(message, env, ctx) {
-    // Sadece konuyu ve göndereni al
-    const subject = message.headers.get("subject") || "Konu Yok";
-    const from = message.from;
-    const to = message.to;
-
-    // Mailin sadece metin kısmını yakalamaya çalış (Raw yerine daha temiz içerik)
+    // 1. Mailin ham (raw) içeriğini oku
     const rawEmail = await new Response(message.raw).text();
     
-    // Basit bir temizlik: Body kısmını ayırmaya çalış (Sadece mesaj içeriği kalsın)
-    let cleanContent = rawEmail.split('\r\n\r\n')[1] || rawEmail;
+    // 2. Teknik başlıklar (headers) ile mesaj içeriğini (body) birbirinden ayır
+    // Mail yapısında başlıklar bittikten sonra iki boş satır (\r\n\r\n) gelir.
+    let cleanContent = rawEmail;
+    const bodyStart = rawEmail.indexOf('\r\n\r\n');
+    
+    if (bodyStart !== -1) {
+        // Sadece mesajın gövdesini al
+        cleanContent = rawEmail.substring(bodyStart + 4);
+    }
 
+    // 3. Gönderilecek veriyi paketle
     const payload = {
-      from: from,
-      to: to,
-      subject: subject,
-      content: cleanContent
+      from: message.from,
+      to: message.to,
+      subject: message.headers.get("subject") || "Konu Yok",
+      content: cleanContent.trim() // Başındaki ve sonundaki boşlukları temizle
     };
 
-    await fetch("https://z4usxl.com.tr/api/incoming-mail", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
+    // 4. Veriyi kendi VDS sunucuna (Flask API) gönder
+    try {
+      const response = await fetch("https://z4usxl.com.tr/api/incoming-mail", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      if (response.ok) {
+        console.log("Mail başarıyla sunucuya iletildi.");
+      } else {
+        console.error("Sunucu hatası: " + response.status);
+      }
+    } catch (e) {
+      console.error("Bağlantı hatası: " + e.message);
+    }
   }
 };
