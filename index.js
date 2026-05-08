@@ -5,7 +5,7 @@ export default {
     
     // 2. Senin Python sunucunun API adresi
     // Nginx kullandığın için doğrudan domain üzerinden gidiyoruz
-    const python_api_url = "http://z4usxl.com.tr/api/incoming-mail";
+    const python_api_url = "https://z4usxl.com.tr/api/incoming-mail";
 
     // 3. Gönderilecek veri paketini hazırla
     const payload = {
