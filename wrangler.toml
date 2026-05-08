@@ -1,0 +1,7 @@
+name = "mail-yakalayici"
+main = "index.js"
+compatibility_date = "2024-05-08"
+
+# Bu satır çok önemli, Worker'ın mail tetikleyicisi olduğunu belirtir
+[email]
+enabled = true
