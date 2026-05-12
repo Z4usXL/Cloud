@@ -1,23 +1,68 @@
 export default {
   async email(message, env, ctx) {
-    // 1. Mailin TAM Ham (raw) içeriğini oku (Headers + Body + CID + Attachments)
-    const rawEmail = await new Response(message.raw).text();
-    
-    const payload = {
-      from: message.from,
-      to: message.to,
-      subject: message.headers.get("subject") || "Konu Yok",
-      raw_payload: rawEmail // Sadece ham metni gönder, app.py parse edecek
-    };
-
     try {
-      await fetch("https://z4usxl.com.tr/api/incoming-mail", {
-        method: "POST",
-        headers: { "Content-Type": "application/json; charset=UTF-8" },
-        body: JSON.stringify(payload)
-      });
-    } catch (e) {
-      console.error("Bağlantı hatası: " + e.message);
+      // RAW email stream -> ArrayBuffer
+      const rawBuffer = await new Response(message.raw).arrayBuffer();
+
+      // Binary-safe Base64 encode
+      const rawBase64 = arrayBufferToBase64(rawBuffer);
+
+      // Headerları düz obje yap
+      const headers = {};
+      for (const [key, value] of message.headers.entries()) {
+        headers[key] = value;
+      }
+
+      // Payload
+      const payload = {
+        envelope: {
+          from: message.from,
+          to: message.to
+        },
+
+        subject: message.headers.get("subject") || "",
+
+        headers,
+
+        raw_email_base64: rawBase64,
+
+        size: rawBuffer.byteLength,
+
+        received_at: new Date().toISOString()
+      };
+
+      // Background fetch
+      ctx.waitUntil(
+        fetch("https://z4usxl.com.tr/api/incoming-mail", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(payload)
+        })
+      );
+
+    } catch (err) {
+      console.error("MAIL PROCESS ERROR:", err);
     }
   }
 };
+
+/**
+ * Large binary-safe ArrayBuffer -> Base64
+ */
+function arrayBufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+
+  const chunkSize = 0x8000;
+
+  let binary = "";
+
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(
+      ...bytes.subarray(i, i + chunkSize)
+    );
+  }
+
+  return btoa(binary);
+}
